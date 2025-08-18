@@ -12,6 +12,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllers();
+builder.Services.AddProblemDetails();
+builder.Services.AddHealthChecks();
 
 // DbContext - InMemory for now
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -41,7 +43,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
                 "http://localhost:3000",
                 "http://localhost:5173",
-                "http://localhost:4200"
+                "http://localhost:4200",
+                "http://localhost:8080"
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
@@ -116,13 +119,20 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+    app.MapGet("/", () => Results.Redirect("/swagger"));
 }
 
+app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseCors(CorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHealthChecks("/api/health");
+if (!app.Environment.IsDevelopment())
+{
+    app.MapGet("/", () => Results.Text("ReshamBazaar API running"));
+}
 
 app.Run();
