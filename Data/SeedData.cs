@@ -39,6 +39,18 @@ public static class SeedData
             await userMgr.CreateAsync(user, defaultPassword);
         }
 
+        // Seed coupons if empty
+        if (!ctx.Coupons.Any())
+        {
+            var now = DateTime.UtcNow;
+            ctx.Coupons.AddRange(
+                new Coupon { Code = "WELCOME10", Type = DiscountType.Percent, Amount = 10, ExpiresAt = now.AddMonths(6), IsActive = true, MinOrderAmount = 1000, MaxDiscount = 1500 },
+                new Coupon { Code = "FEST500", Type = DiscountType.Fixed, Amount = 500, ExpiresAt = now.AddMonths(3), IsActive = true, MinOrderAmount = 3000 },
+                new Coupon { Code = "BIGSALE20", Type = DiscountType.Percent, Amount = 20, ExpiresAt = now.AddMonths(1), IsActive = true, MinOrderAmount = 5000, MaxDiscount = 3000 }
+            );
+        }
+
         await ctx.SaveChangesAsync();
     }
 }
+

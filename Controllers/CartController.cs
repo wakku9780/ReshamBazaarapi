@@ -43,6 +43,15 @@ public class CartController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("count")]
+    public async Task<ActionResult<int>> Count()
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+        var count = await _ctx.CartItems.Where(ci => ci.UserId == userId).SumAsync(ci => ci.Quantity);
+        return Ok(count);
+    }
+
     [HttpPost("add")]
     public async Task<ActionResult<CartItemReadDto>> Add(CartItemRequestDto dto)
     {
@@ -65,6 +74,21 @@ public class CartController : ControllerBase
         await _ctx.SaveChangesAsync();
 
         return await GetItem(dto.ProductId);
+    }
+
+    // Base route support: POST /api/cart with { productId, quantity }
+    [HttpPost]
+    public Task<ActionResult<CartItemReadDto>> AddAtBase([FromBody] CartItemRequestDto dto)
+        => Add(dto);
+
+    // Compatibility route for clients calling POST /api/cart/{productId} with optional { quantity } body
+    public record QuantityOnly(int Quantity);
+
+    [HttpPost("{productId:int}")]
+    public Task<ActionResult<CartItemReadDto>> AddByProductId(int productId, [FromBody] QuantityOnly? body)
+    {
+        var qty = body?.Quantity ?? 1;
+        return Add(new CartItemRequestDto(productId, qty));
     }
 
     private async Task<ActionResult<CartItemReadDto>> GetItem(int productId)

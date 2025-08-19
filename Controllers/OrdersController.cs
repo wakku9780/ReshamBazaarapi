@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using ReshamBazaar.Api.Data;
 using ReshamBazaar.Api.DTOs;
 using ReshamBazaar.Api.Models;
+using ReshamBazaar.Api.Services;
 
 namespace ReshamBazaar.Api.Controllers;
 
@@ -14,9 +15,11 @@ namespace ReshamBazaar.Api.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly AppDbContext _ctx;
-    public OrdersController(AppDbContext ctx)
+    private readonly ICheckoutService _checkout;
+    public OrdersController(AppDbContext ctx, ICheckoutService checkout)
     {
         _ctx = ctx;
+        _checkout = checkout;
     }
 
     private string? GetUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub")?.Value;
@@ -60,9 +63,28 @@ public class OrdersController : ControllerBase
             order.Id,
             order.CreatedAt,
             order.Total,
+            0,
+            order.Total,
+            null,
             order.Items.Select(i => new OrderItemReadDto(i.ProductId, i.ProductName, i.UnitPrice, i.Quantity)).ToList()
         );
         return CreatedAtAction(nameof(GetMyOrders), new { }, read);
+    }
+
+    [HttpPost("checkout")]
+    public async Task<ActionResult<OrderReadDto>> Checkout(CheckoutRequestDto request)
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+        try
+        {
+            var order = await _checkout.CheckoutAsync(userId, request);
+            return CreatedAtAction(nameof(GetMyOrders), new { }, order);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpGet("my")]
@@ -81,6 +103,9 @@ public class OrdersController : ControllerBase
             o.Id,
             o.CreatedAt,
             o.Total,
+            o.Discount,
+            o.FinalTotal == 0 ? o.Total - o.Discount : o.FinalTotal,
+            o.CouponCode,
             o.Items.Select(i => new OrderItemReadDto(i.ProductId, i.ProductName, i.UnitPrice, i.Quantity)).ToList()
         ));
         return Ok(result);

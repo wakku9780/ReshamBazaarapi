@@ -7,6 +7,7 @@ using Microsoft.OpenApi.Models;
 using ReshamBazaar.Api.Data;
 using ReshamBazaar.Api.Models;
 using ReshamBazaar.Api.Services;
+using ReshamBazaar.Api.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -102,6 +103,15 @@ builder.Services.AddSwaggerGen(c =>
 
 // Application services
 builder.Services.AddScoped<ITokenService, TokenService>();
+builder.Services.AddScoped<IProductRepository, ProductRepository>();
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<IWishlistRepository, WishlistRepository>();
+builder.Services.AddScoped<IWishlistService, WishlistService>();
+builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
+builder.Services.AddScoped<ICouponRepository, CouponRepository>();
+builder.Services.AddScoped<ICouponService, CouponService>();
+builder.Services.AddScoped<ICheckoutService, CheckoutService>();
 
 var app = builder.Build();
 
