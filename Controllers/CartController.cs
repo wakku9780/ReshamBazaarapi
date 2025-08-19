@@ -91,6 +91,41 @@ public class CartController : ControllerBase
         return Add(new CartItemRequestDto(productId, qty));
     }
 
+    // Compatibility: PATCH /api/cart/{productId} to update quantity
+    [HttpPatch("{productId:int}")]
+    public async Task<ActionResult> PatchQuantity(int productId, [FromBody] QuantityOnly? body)
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+
+        var ci = await _ctx.CartItems.FirstOrDefaultAsync(x => x.UserId == userId && x.ProductId == productId);
+        if (ci == null) return NotFound();
+
+        if (body is null)
+        {
+            // No body => increment by 1
+            ci.Quantity += 1;
+        }
+        else
+        {
+            ci.Quantity = body.Quantity;
+        }
+
+        if (ci.Quantity <= 0)
+        {
+            _ctx.CartItems.Remove(ci);
+            await _ctx.SaveChangesAsync();
+            return NoContent();
+        }
+
+        await _ctx.SaveChangesAsync();
+        // return updated item
+        var item = await _ctx.CartItems.Include(x => x.Product).FirstOrDefaultAsync(x => x.Id == ci.Id);
+        if (item == null) return NotFound();
+        var read = new CartItemReadDto(item.Id, item.ProductId, item.Product?.Name ?? string.Empty, item.Product?.Price ?? 0, item.Quantity, (item.Product?.Price ?? 0) * item.Quantity);
+        return Ok(read);
+    }
+
     private async Task<ActionResult<CartItemReadDto>> GetItem(int productId)
     {
         var userId = GetUserId();

@@ -4,18 +4,21 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using ReshamBazaar.Api.Models;
+using Microsoft.AspNetCore.Identity;
 
 namespace ReshamBazaar.Api.Services;
 
 public class TokenService : ITokenService
 {
     private readonly IConfiguration _config;
-    public TokenService(IConfiguration config)
+    private readonly UserManager<ApplicationUser> _userManager;
+    public TokenService(IConfiguration config, UserManager<ApplicationUser> userManager)
     {
         _config = config;
+        _userManager = userManager;
     }
 
-    public string CreateToken(ApplicationUser user)
+    public async Task<string> CreateTokenAsync(ApplicationUser user)
     {
         var jwtSection = _config.GetSection("Jwt");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSection["Key"]!));
@@ -27,6 +30,12 @@ public class TokenService : ITokenService
             new("fullname", user.FullName ?? string.Empty)
         };
 
+        var roles = await _userManager.GetRolesAsync(user);
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+        }
+
         var token = new JwtSecurityToken(
             issuer: jwtSection["Issuer"],
             audience: jwtSection["Audience"],
@@ -37,3 +46,4 @@ public class TokenService : ITokenService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
+

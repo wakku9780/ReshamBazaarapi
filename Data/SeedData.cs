@@ -24,9 +24,17 @@ public static class SeedData
             ctx.Products.AddRange(products);
         }
 
-        // Seed default user
+        // Seed roles and users
         const string defaultEmail = "demo@reshambazaar.com";
         const string defaultPassword = "Password1!";
+        const string adminEmail = "admin@reshambazaar.com";
+        const string adminPassword = "AdminPass1!";
+
+        if (!await roleMgr.RoleExistsAsync("Admin"))
+        {
+            await roleMgr.CreateAsync(new IdentityRole("Admin"));
+        }
+
         if (await userMgr.FindByEmailAsync(defaultEmail) is null)
         {
             var user = new ApplicationUser
@@ -37,6 +45,23 @@ public static class SeedData
                 FullName = "Demo User"
             };
             await userMgr.CreateAsync(user, defaultPassword);
+        }
+
+        var adminUser = await userMgr.FindByEmailAsync(adminEmail);
+        if (adminUser is null)
+        {
+            adminUser = new ApplicationUser
+            {
+                UserName = adminEmail,
+                Email = adminEmail,
+                EmailConfirmed = true,
+                FullName = "Admin User"
+            };
+            await userMgr.CreateAsync(adminUser, adminPassword);
+        }
+        if (!await userMgr.IsInRoleAsync(adminUser, "Admin"))
+        {
+            await userMgr.AddToRoleAsync(adminUser, "Admin");
         }
 
         // Seed coupons if empty

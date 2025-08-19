@@ -4,5 +4,5 @@ namespace ReshamBazaar.Api.Services;
 
 public interface ITokenService
 {
-    string CreateToken(ApplicationUser user);
+    Task<string> CreateTokenAsync(ApplicationUser user);
 }

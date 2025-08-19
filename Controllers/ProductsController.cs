@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using ReshamBazaar.Api.DTOs;
 using ReshamBazaar.Api.Models;
 using ReshamBazaar.Api.Services;
+using System.Text.RegularExpressions;
 
 namespace ReshamBazaar.Api.Controllers;
 
@@ -41,6 +42,19 @@ public class ProductsController : ControllerBase
             Page = page,
             PageSize = pageSize
         });
+        // Normalize image URLs without mutating init-only record properties
+        var baseUrl = $"{Request.Scheme}://{Request.Host}";
+        if (result?.Items != null)
+        {
+            result.Items = result.Items.Select(item =>
+            {
+                if (!string.IsNullOrWhiteSpace(item.ImageUrl) && item.ImageUrl.StartsWith("/"))
+                {
+                    return item with { ImageUrl = baseUrl + item.ImageUrl };
+                }
+                return item;
+            }).ToList();
+        }
         return Ok(result);
     }
 
@@ -50,6 +64,12 @@ public class ProductsController : ControllerBase
     {
         var p = await _svc.GetByIdAsync(id);
         if (p == null) return NotFound();
+        if (!string.IsNullOrWhiteSpace(p.ImageUrl) && p.ImageUrl.StartsWith("/"))
+        {
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var p2 = p with { ImageUrl = baseUrl + p.ImageUrl };
+            return Ok(p2);
+        }
         return Ok(p);
     }
 

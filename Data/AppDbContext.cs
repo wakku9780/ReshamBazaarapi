@@ -23,6 +23,9 @@ public class AppDbContext : IdentityDbContext<ApplicationUser>
     {
         base.OnModelCreating(builder);
 
+        // TEMP: Ignore IsBlocked until migrations are applied to add the column to AspNetUsers
+        builder.Entity<ApplicationUser>().Ignore(u => u.IsBlocked);
+
         // CartItem unique per user+product
         builder.Entity<CartItem>()
             .HasIndex(ci => new { ci.UserId, ci.ProductId })

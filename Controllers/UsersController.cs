@@ -43,7 +43,7 @@ public class UsersController : ControllerBase
         {
             return BadRequest(result.Errors);
         }
-        var token = _tokenService.CreateToken(user);
+        var token = await _tokenService.CreateTokenAsync(user);
         return Created("api/users/me", new AuthResponseDto(token, user.Email!, user.FullName));
     }
 
@@ -53,9 +53,10 @@ public class UsersController : ControllerBase
     {
         var user = await _userManager.FindByEmailAsync(dto.Email);
         if (user == null) return Unauthorized();
+        if (user.IsBlocked) return Forbid();
         var result = await _signInManager.CheckPasswordSignInAsync(user, dto.Password, false);
         if (!result.Succeeded) return Unauthorized();
-        var token = _tokenService.CreateToken(user);
+        var token = await _tokenService.CreateTokenAsync(user);
         return Ok(new AuthResponseDto(token, user.Email!, user.FullName));
     }
 

@@ -16,10 +16,11 @@ builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 
-// DbContext - InMemory for now
+// DbContext - SQL Server
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    options.UseInMemoryDatabase("ReshamBazaarDb");
+    var conn = builder.Configuration.GetConnectionString("DefaultConnection");
+    options.UseSqlServer(conn);
 });
 
 // Identity
@@ -121,6 +122,7 @@ using (var scope = app.Services.CreateScope())
     var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var userMgr = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
     var roleMgr = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+    await ctx.Database.MigrateAsync();
     await SeedData.InitializeAsync(ctx, userMgr, roleMgr);
 }
 
@@ -133,7 +135,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseExceptionHandler();
-app.UseHttpsRedirection();
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+app.UseStaticFiles();
 app.UseCors(CorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();

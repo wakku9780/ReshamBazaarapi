@@ -1,5 +1,13 @@
 namespace ReshamBazaar.Api.Models;
 
+public enum OrderStatus
+{
+    Pending = 1,
+    Shipped = 2,
+    Delivered = 3,
+    Cancelled = 4
+}
+
 public class Order
 {
     public int Id { get; set; }
@@ -10,6 +18,7 @@ public class Order
     public decimal FinalTotal { get; set; }
     public string? CouponCode { get; set; }
     public string? ShippingAddress { get; set; }
+    public OrderStatus Status { get; set; } = OrderStatus.Pending;
 
     public List<OrderItem> Items { get; set; } = new();
 }
