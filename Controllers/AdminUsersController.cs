@@ -60,8 +60,14 @@ public class AdminUsersController : ControllerBase
         var u = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
         if (u is null) return NotFound();
         u.IsBlocked = true;
-        await _userManager.UpdateAsync(u);
-        return NoContent();
+        var result = await _userManager.UpdateAsync(u);
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors);
+        }
+        var roles = await _userManager.GetRolesAsync(u);
+        var dto = new UserSummaryDto(u.Id, u.Email ?? string.Empty, u.FullName, u.EmailConfirmed, u.IsBlocked, roles);
+        return Ok(dto);
     }
 
     [HttpPatch("{id}/unblock")]
@@ -70,7 +76,13 @@ public class AdminUsersController : ControllerBase
         var u = await _userManager.Users.FirstOrDefaultAsync(x => x.Id == id);
         if (u is null) return NotFound();
         u.IsBlocked = false;
-        await _userManager.UpdateAsync(u);
-        return NoContent();
+        var result = await _userManager.UpdateAsync(u);
+        if (!result.Succeeded)
+        {
+            return BadRequest(result.Errors);
+        }
+        var roles = await _userManager.GetRolesAsync(u);
+        var dto = new UserSummaryDto(u.Id, u.Email ?? string.Empty, u.FullName, u.EmailConfirmed, u.IsBlocked, roles);
+        return Ok(dto);
     }
 }

@@ -53,7 +53,7 @@ public class UsersController : ControllerBase
     {
         var user = await _userManager.FindByEmailAsync(dto.Email);
         if (user == null) return Unauthorized();
-        if (user.IsBlocked) return Forbid();
+        if (user.IsBlocked) return StatusCode(403, new { message = "Your account is blocked" });
         var result = await _signInManager.CheckPasswordSignInAsync(user, dto.Password, false);
         if (!result.Succeeded) return Unauthorized();
         var token = await _tokenService.CreateTokenAsync(user);

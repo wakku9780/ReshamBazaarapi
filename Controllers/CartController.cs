@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using ReshamBazaar.Api.Data;
 using ReshamBazaar.Api.DTOs;
 using ReshamBazaar.Api.Models;
+using ReshamBazaar.Api.Services;
 
 namespace ReshamBazaar.Api.Controllers;
 
@@ -14,33 +15,65 @@ namespace ReshamBazaar.Api.Controllers;
 public class CartController : ControllerBase
 {
     private readonly AppDbContext _ctx;
-    public CartController(AppDbContext ctx)
+    private readonly ICouponService _couponService;
+    public CartController(AppDbContext ctx, ICouponService couponService)
     {
         _ctx = ctx;
+        _couponService = couponService;
     }
 
     private string? GetUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub")?.Value;
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<CartItemReadDto>>> Get()
+    public async Task<ActionResult<CartSummaryDto>> Get([FromQuery] string? code)
     {
         var userId = GetUserId();
         if (userId is null) return Unauthorized();
 
-        var items = await _ctx.CartItems
+        var itemsQ = await _ctx.CartItems
             .Include(ci => ci.Product)
             .Where(ci => ci.UserId == userId)
             .ToListAsync();
 
-        var result = items.Select(ci => new CartItemReadDto(
+        var items = itemsQ.Select(ci => new CartItemReadDto(
             ci.Id,
             ci.ProductId,
             ci.Product?.Name ?? string.Empty,
             ci.Product?.Price ?? 0,
             ci.Quantity,
             (ci.Product?.Price ?? 0) * ci.Quantity
-        ));
-        return Ok(result);
+        )).ToList();
+
+        var subtotal = items.Sum(i => i.LineTotal);
+        var validation = await _couponService.ValidateAsync(code, subtotal);
+        var summary = new CartSummaryDto(
+            Subtotal: subtotal,
+            Discount: validation.DiscountAmount,
+            FinalTotal: validation.FinalTotal,
+            Items: items
+        );
+        return Ok(summary);
+    }
+
+    // Compatibility endpoint to return only items if some clients still expect array
+    [HttpGet("items")]
+    public async Task<ActionResult<IEnumerable<CartItemReadDto>>> GetItems()
+    {
+        var userId = GetUserId();
+        if (userId is null) return Unauthorized();
+        var items = await _ctx.CartItems
+            .Include(ci => ci.Product)
+            .Where(ci => ci.UserId == userId)
+            .Select(ci => new CartItemReadDto(
+                ci.Id,
+                ci.ProductId,
+                ci.Product!.Name,
+                ci.Product.Price,
+                ci.Quantity,
+                ci.Product.Price * ci.Quantity
+            ))
+            .ToListAsync();
+        return Ok(items);
     }
 
     [HttpGet("count")]
@@ -124,6 +157,74 @@ public class CartController : ControllerBase
         if (item == null) return NotFound();
         var read = new CartItemReadDto(item.Id, item.ProductId, item.Product?.Name ?? string.Empty, item.Product?.Price ?? 0, item.Quantity, (item.Product?.Price ?? 0) * item.Quantity);
         return Ok(read);
+    }
+
+    // Apply coupon and return full cart summary. If user is authenticated, subtotal/items are computed from DB cart; otherwise uses provided subtotal.
+    // POST /api/cart/apply-coupon
+    [HttpPost("apply-coupon")]
+    [AllowAnonymous]
+    public async Task<ActionResult<CartSummaryDto>> ApplyCoupon([FromBody] ApplyCouponRequest request)
+    {
+        if (request is null) return BadRequest(new { message = "Invalid request" });
+
+        // Try to compute from current user's cart
+        var userId = GetUserId();
+        decimal subtotal;
+        List<CartItemReadDto> items = new();
+        if (!string.IsNullOrEmpty(userId))
+        {
+            var cartItems = await _ctx.CartItems.Include(ci => ci.Product).Where(ci => ci.UserId == userId).ToListAsync();
+            foreach (var ci in cartItems)
+            {
+                var unit = ci.Product?.Price ?? 0;
+                var line = unit * ci.Quantity;
+                items.Add(new CartItemReadDto(ci.Id, ci.ProductId, ci.Product?.Name ?? string.Empty, unit, ci.Quantity, line));
+            }
+            subtotal = items.Sum(i => i.LineTotal);
+        }
+        else
+        {
+            subtotal = Math.Max(0, request.Subtotal);
+        }
+
+        var validation = await _couponService.ValidateAsync(request.Code, subtotal);
+        var summary = new CartSummaryDto(
+            Subtotal: subtotal,
+            Discount: validation.DiscountAmount,
+            FinalTotal: validation.FinalTotal,
+            Items: items
+        );
+        return Ok(summary);
+    }
+
+    // GET /api/cart/summary?code=COUPON (optional convenience endpoint)
+    [HttpGet("summary")]
+    [AllowAnonymous]
+    public async Task<ActionResult<CartSummaryDto>> GetSummary([FromQuery] string? code)
+    {
+        var userId = GetUserId();
+        decimal subtotal = 0;
+        List<CartItemReadDto> items = new();
+        if (!string.IsNullOrEmpty(userId))
+        {
+            var cartItems = await _ctx.CartItems.Include(ci => ci.Product).Where(ci => ci.UserId == userId).ToListAsync();
+            foreach (var ci in cartItems)
+            {
+                var unit = ci.Product?.Price ?? 0;
+                var line = unit * ci.Quantity;
+                items.Add(new CartItemReadDto(ci.Id, ci.ProductId, ci.Product?.Name ?? string.Empty, unit, ci.Quantity, line));
+            }
+            subtotal = items.Sum(i => i.LineTotal);
+        }
+
+        var validation = await _couponService.ValidateAsync(code, subtotal);
+        var summary = new CartSummaryDto(
+            Subtotal: subtotal,
+            Discount: validation.DiscountAmount,
+            FinalTotal: validation.FinalTotal,
+            Items: items
+        );
+        return Ok(summary);
     }
 
     private async Task<ActionResult<CartItemReadDto>> GetItem(int productId)
