@@ -55,6 +55,36 @@ public class CartController : ControllerBase
         return Ok(summary);
     }
 
+    // POST /api/cart/remove-coupon -> returns summary without applying any coupon
+    [HttpPost("remove-coupon")]
+    [AllowAnonymous]
+    public async Task<ActionResult<CartSummaryDto>> RemoveCoupon()
+    {
+        var userId = GetUserId();
+        decimal subtotal = 0;
+        List<CartItemReadDto> items = new();
+        if (!string.IsNullOrEmpty(userId))
+        {
+            var cartItems = await _ctx.CartItems.Include(ci => ci.Product).Where(ci => ci.UserId == userId).ToListAsync();
+            foreach (var ci in cartItems)
+            {
+                var unit = ci.Product?.Price ?? 0;
+                var line = unit * ci.Quantity;
+                items.Add(new CartItemReadDto(ci.Id, ci.ProductId, ci.Product?.Name ?? string.Empty, unit, ci.Quantity, line));
+            }
+            subtotal = items.Sum(i => i.LineTotal);
+        }
+
+        // No coupon applied
+        var summary = new CartSummaryDto(
+            Subtotal: subtotal,
+            Discount: 0,
+            FinalTotal: subtotal,
+            Items: items
+        );
+        return Ok(summary);
+    }
+
     // Compatibility endpoint to return only items if some clients still expect array
     [HttpGet("items")]
     public async Task<ActionResult<IEnumerable<CartItemReadDto>>> GetItems()

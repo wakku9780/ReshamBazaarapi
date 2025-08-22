@@ -66,6 +66,7 @@ public class OrdersController : ControllerBase
             0,
             order.Total,
             null,
+            order.Status,
             order.Items.Select(i => new OrderItemReadDto(i.ProductId, i.ProductName, i.UnitPrice, i.Quantity)).ToList()
         );
         return CreatedAtAction(nameof(GetMyOrders), new { }, read);
@@ -106,6 +107,7 @@ public class OrdersController : ControllerBase
             o.Discount,
             o.FinalTotal == 0 ? o.Total - o.Discount : o.FinalTotal,
             o.CouponCode,
+            o.Status,
             o.Items.Select(i => new OrderItemReadDto(i.ProductId, i.ProductName, i.UnitPrice, i.Quantity)).ToList()
         ));
         return Ok(result);

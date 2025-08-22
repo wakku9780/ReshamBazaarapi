@@ -17,6 +17,8 @@ public class CheckoutService : ICheckoutService
 
     public async Task<OrderReadDto> CheckoutAsync(string userId, CheckoutRequestDto request, CancellationToken ct = default)
     {
+        Console.WriteLine($"CouponCode received: '{request.CouponCode}'");
+
         var items = await _ctx.CartItems.Include(ci => ci.Product).Where(ci => ci.UserId == userId).ToListAsync(ct);
         if (items.Count == 0) throw new InvalidOperationException("Cart is empty");
 
@@ -25,8 +27,14 @@ public class CheckoutService : ICheckoutService
         {
             UserId = userId,
             CreatedAt = DateTime.UtcNow,
-            ShippingAddress = request.ShippingAddress
+            ShippingAddress = request.Address != null
+    ? $"{request.Address.FullName}, {request.Address.Line1}" +
+      $"{(!string.IsNullOrWhiteSpace(request.Address.Line2) ? ", " + request.Address.Line2 : "")}, " +
+      $"{request.Address.City} - {request.Address.Pincode}, {request.Address.Phone}"
+    : null
+
         };
+
         foreach (var ci in items)
         {
             if (ci.Product == null) continue;
@@ -68,6 +76,7 @@ public class CheckoutService : ICheckoutService
             order.Discount,
             order.FinalTotal,
             order.CouponCode,
+            order.Status,
             order.Items.Select(i => new OrderItemReadDto(i.ProductId, i.ProductName, i.UnitPrice, i.Quantity)).ToList()
         );
     }
